@@ -91,7 +91,7 @@ public class HypixelFilterScreen extends Screen {
         this.addRenderableWidget(Button.builder(
                 getChannelText(I18n.getString("translatormod.hypixel.channel.all"), config.hypixelAllChat),
                 btn -> {
-                    config.hypixelAllChat = nextMode(config.hypixelAllChat);
+                    config.hypixelAllChat = nextAllChatMode(config.hypixelAllChat);
                     config.save();
                     btn.setMessage(getChannelText(I18n.getString("translatormod.hypixel.channel.all"), config.hypixelAllChat));
                 }
@@ -142,6 +142,11 @@ public class HypixelFilterScreen extends Screen {
             case "AUTO"  -> "CLICK";
             default      -> "OFF";
         };
+    }
+
+    /** All Chat は OFF にできない（TranslatorConfig の検証と同じ）ため AUTO ⇔ CLICK のみ切り替える */
+    private static String nextAllChatMode(String current) {
+        return "AUTO".equals(current) ? "CLICK" : "AUTO";
     }
 
     private Component getHypixelModeText() {
