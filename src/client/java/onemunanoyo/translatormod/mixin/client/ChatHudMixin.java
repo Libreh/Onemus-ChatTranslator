@@ -1,5 +1,6 @@
 package onemunanoyo.translatormod.mixin.client;
 
+import com.llamalad7.mixinextras.sugar.Local;
 import net.minecraft.ChatFormatting;
 import net.minecraft.client.gui.components.ChatComponent;
 import net.minecraft.client.multiplayer.chat.GuiMessageSource;
@@ -53,12 +54,12 @@ public class ChatHudMixin {
             at = @At("HEAD"),
             argsOnly = true
     )
-    private Component injectTranslateButton(Component message) {
+    private Component injectTranslateButton(Component message, @Local(argsOnly = true) GuiMessageSource source) {
         if (message == null) return null;
         String content = message.getString();
 
         TranslatorConfig config = TranslatorConfig.getInstance();
-        if (config.apiKey.isBlank()) {
+        if (!config.enabled || config.apiKey.isBlank()) {
             return message;
         }
 
@@ -72,6 +73,9 @@ public class ChatHudMixin {
             // AUTO は GAMEイベントハンドラの autoTranslate() が担当するためボタン不要
             // OFF はそもそも翻訳しない
             if ("OFF".equals(mode) || "AUTO".equals(mode)) return message;
+        } else if (source != GuiMessageSource.PLAYER && !config.translateSystemMessages) {
+            // 通常モードでシステムメッセージ翻訳が OFF ならプレイヤー以外のメッセージにはボタンを付けない
+            return message;
         }
 
         // 翻訳対象のテキスト抽出（プレイヤー名を除去しようと試みる）
