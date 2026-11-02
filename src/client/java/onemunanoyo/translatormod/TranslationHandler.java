@@ -19,8 +19,12 @@ import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 public class TranslationHandler {
+
+    private static final Logger LOGGER = LoggerFactory.getLogger("TranslatorMod");
 
     /** エラー文字列の先頭に付与するセンチネル。翻訳結果には絶対に含まれない。 */
     public static final String ERR_SENTINEL = "\u0000";
@@ -111,11 +115,11 @@ public class TranslationHandler {
             } catch (DeepLException e) {
                 return handleDeepLError(e);
             } catch (ParseException e) {
-                System.err.println("[TranslatorMod] API Parse error: " + e.getMessage());
+                LOGGER.warn("API Parse error: {}", e.getMessage());
                 return ERR_SENTINEL + I18n.getString("translatormod.chat.error.parse");
             } catch (Exception e) {
                 // ネットワーク切断・タイムアウトなど
-                System.err.println("[TranslatorMod] Network error: " + e.getMessage());
+                LOGGER.warn("Network error: {}", e.getMessage());
                 return ERR_SENTINEL + I18n.getString("translatormod.chat.error.network");
             } finally {
                 // Error を含むあらゆる例外でも必ず解放する
@@ -173,10 +177,10 @@ public class TranslationHandler {
             } catch (DeepLException e) {
                 return handleDeepLError(e);
             } catch (ParseException e) {
-                System.err.println("[TranslatorMod] API Parse error: " + e.getMessage());
+                LOGGER.warn("API Parse error: {}", e.getMessage());
                 return ERR_SENTINEL + I18n.getString("translatormod.chat.error.parse");
             } catch (Exception e) {
-                System.err.println("[TranslatorMod] Network error: " + e.getMessage());
+                LOGGER.warn("Network error: {}", e.getMessage());
                 return ERR_SENTINEL + I18n.getString("translatormod.chat.error.network");
             } finally {
                 inProgress.remove(cacheKey);
@@ -306,11 +310,11 @@ public class TranslationHandler {
                 return I18n.getString("translatormod.usage.error.timeout");
             } catch (ParseException e) {
                 usageCooldownUntil = 0L;
-                System.err.println("[TranslatorMod] Usage API Parse error: " + e.getMessage());
+                LOGGER.warn("Usage API Parse error: {}", e.getMessage());
                 return I18n.getString("translatormod.usage.error.parse");
             } catch (Exception e) {
                 usageCooldownUntil = 0L;
-                System.err.println("[TranslatorMod] Usage fetch error: " + e.getMessage());
+                LOGGER.warn("Usage fetch error: {}", e.getMessage());
                 return I18n.getString("translatormod.usage.error.failed");
             }
         });
@@ -374,13 +378,13 @@ public class TranslationHandler {
                 // APIキーが無効 → 手動で直してもらうまで停止
                 suspended = true;
                 suspendReason = I18n.getString("translatormod.chat.error.reason.auth");
-                System.err.println("[TranslatorMod] Invalid API key. Translation suspended.");
+                LOGGER.warn("Invalid API key. Translation suspended.");
                 return ERR_SENTINEL + I18n.getString("translatormod.chat.error.suspended");
 
             case 429:
                 // レート制限 → バックオフして自動復帰
                 rateLimitUntil = System.currentTimeMillis() + rateLimitBackoffSec * 1000L;
-                System.err.println("[TranslatorMod] Rate limited. Waiting " + rateLimitBackoffSec + "s.");
+                LOGGER.warn("Rate limited. Waiting {}s.", rateLimitBackoffSec);
                 rateLimitBackoffSec = Math.min(rateLimitBackoffSec * 2, 300); // 最大5分
                 return ERR_SENTINEL + I18n.getString("translatormod.chat.error.rate_limit");
 
@@ -388,7 +392,7 @@ public class TranslationHandler {
                 // 月間文字数上限 → 月が変わるまで停止
                 suspended = true;
                 suspendReason = I18n.getString("translatormod.chat.error.reason.quota");
-                System.err.println("[TranslatorMod] Character quota exceeded. Translation suspended.");
+                LOGGER.warn("Character quota exceeded. Translation suspended.");
                 return ERR_SENTINEL + I18n.getString("translatormod.chat.error.quota");
 
             case 503:
@@ -397,7 +401,7 @@ public class TranslationHandler {
                 return ERR_SENTINEL + I18n.getString("translatormod.chat.error.service_down");
 
             default:
-                System.err.println("[TranslatorMod] DeepL HTTP " + e.statusCode + ": " + e.body);
+                LOGGER.warn("DeepL HTTP {}: {}", e.statusCode, e.body);
                 return ERR_SENTINEL + I18n.getString("translatormod.chat.error.http", e.statusCode);
         }
     }

@@ -23,8 +23,12 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.regex.Pattern;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 public class TranslatorConfig {
+
+    private static final Logger LOGGER = LoggerFactory.getLogger("TranslatorMod");
 
     private static final Pattern LEGACY_API_KEY_FIELD = Pattern.compile(
             "(?s)\\\"apiKey\\\"\\s*:\\s*\\\"(?:\\\\.|[^\\\"\\\\])*\\\"\\s*,?");
@@ -97,7 +101,7 @@ public class TranslatorConfig {
                 }
                 loaded = GSON.fromJson(object, TranslatorConfig.class);
             } catch (Exception e) { // IOExceptionだけでなくSyntaxErrorなどもキャッチ
-                System.err.println("[TranslatorMod] Failed to load config: " + e.getMessage());
+                LOGGER.error("Failed to load config: {}", e.getMessage());
                 backupCorruptedConfig();
             }
         }
@@ -157,9 +161,9 @@ public class TranslatorConfig {
             sanitized = MALFORMED_LEGACY_API_KEY_FIELD.matcher(sanitized).replaceAll("");
             Files.writeString(CONFIG_PATH, sanitized, StandardCharsets.UTF_8);
             Files.move(CONFIG_PATH, backupPath, StandardCopyOption.REPLACE_EXISTING);
-            System.err.println("[TranslatorMod] Corrupted config sanitized and moved to " + backupPath);
+            LOGGER.warn("Corrupted config sanitized and moved to {}", backupPath);
         } catch (IOException e) {
-            System.err.println("[TranslatorMod] Failed to backup corrupted config: " + e.getMessage());
+            LOGGER.error("Failed to backup corrupted config: {}", e.getMessage());
         }
     }
 
@@ -240,7 +244,7 @@ public class TranslatorConfig {
             }
             Files.move(tmpPath, CONFIG_PATH, java.nio.file.StandardCopyOption.REPLACE_EXISTING, java.nio.file.StandardCopyOption.ATOMIC_MOVE);
         } catch (IOException e) {
-            System.err.println("[TranslatorMod] Failed to save config: " + e.getMessage());
+            LOGGER.error("Failed to save config: {}", e.getMessage());
         }
     }
 
