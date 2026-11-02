@@ -4,14 +4,10 @@ import onemunanoyo.translatormod.command.TranslateCommand;
 import onemunanoyo.translatormod.config.TranslatorConfig;
 import onemunanoyo.translatormod.config.encryption.EncryptionNotice;
 import onemunanoyo.translatormod.gui.TranslatorKeyBinding;
-import com.mojang.authlib.GameProfile;
 import net.fabricmc.api.ClientModInitializer;
 import net.fabricmc.fabric.api.client.message.v1.ClientReceiveMessageEvents;
 import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents;
-import net.minecraft.ChatFormatting;
 import net.minecraft.client.Minecraft;
-import net.minecraft.network.chat.ClickEvent;
-import net.minecraft.network.chat.MutableComponent;
 import onemunanoyo.translatormod.util.I18n;
 import java.util.regex.Pattern;
 
@@ -32,53 +28,25 @@ public class TranslatorModClient implements ClientModInitializer {
 			}
 		});
 
-		// 公開チャット
-		ClientReceiveMessageEvents.CHAT.register((message, signedMessage, sender, params, receptionTimestamp) -> {
-			String content = message.getString();
-			if (shouldIgnore(content)) return;
-
-			// 自分のチャットはスキップ
-			Minecraft client = Minecraft.getInstance();
-			if (sender != null && client.player != null
-					&& sender.id().equals(client.player.getGameProfile().id())) return;
-
-			TranslatorConfig config = TranslatorConfig.getInstance();
-			if (!config.enabled) return;
-
- 		// Hypixel モード時はシステムメッセージ（sender=null）をスキップ
- 		if (config.hypixelMode && sender == null) return;
-		
- 		// addTranslateButton(client, content); // Mixin で追加するため不要
- 	});
-
-		// システムメッセージ
+		// 翻訳ボタンは ChatHudMixin が付与する。ここでは Hypixel モードの AUTO チャンネルだけを自動翻訳する。
 		ClientReceiveMessageEvents.GAME.register((message, overlay) -> {
 			if (overlay) return;
-			
+
 			String content = message.getString();
 			if (shouldIgnore(content)) return;
 
 			TranslatorConfig config = TranslatorConfig.getInstance();
-			if (!config.enabled) return;
-			
-			// 通常モードかつシステムメッセージ翻訳OFFなら何もしない
-			if (!config.hypixelMode && !config.translateSystemMessages) return;
+			if (!config.enabled || !config.hypixelMode) return;
 
-			Minecraft client = Minecraft.getInstance();
-
-			if (config.hypixelMode) {
-				String mode = getHypixelChannelMode(content);
-				if ("OFF".equals(mode)) return;
-				
-				if ("AUTO".equals(mode)) {
-					autoTranslate(client, content);
-				} else if ("CLICK".equals(mode)) {
-					// addTranslateButton(client, content); // Mixin で追加するため不要
-				}
-			} else {
-				// addTranslateButton(client, content); // Mixin で追加するため不要
+			if ("AUTO".equals(getHypixelChannelMode(content))) {
+				autoTranslate(Minecraft.getInstance(), content);
 			}
 		});
+	}
+
+	/** 色記号 § を取り除いたプレーンテキストを返す */
+	public static String stripColor(String text) {
+		return STRIP_COLOR_PATTERN.matcher(text).replaceAll("");
 	}
 
 	/** 無限ループ防止のため翻訳対象外かどうか判定する */
@@ -86,7 +54,7 @@ public class TranslatorModClient implements ClientModInitializer {
 		if (content == null || content.isBlank()) return true;
 		
 		// 色記号 § を除いたプレーンテキストで比較するために正規表現で除去
-		String plain = STRIP_COLOR_PATTERN.matcher(content).replaceAll("");
+		String plain = stripColor(content);
 		
 		// 翻訳済みメッセージ（プレフィックス [訳] や [Tr] など）を再翻訳しない
 		String translatedPrefix = I18n.getString("translatormod.chat.translated_prefix");
@@ -102,17 +70,17 @@ public class TranslatorModClient implements ClientModInitializer {
 		// フォーマット文字列の最初の動的部分（%）より前を静的ラベルとして使う
 		int pctIdx = usageInfo.indexOf('%');
 		String usageLabel = pctIdx > 0 ? usageInfo.substring(0, pctIdx).trim() : usageInfo;
-        if (plain.startsWith(msgPrefix) && !plain.contains(usageLabel)) {
-            return true;
-        }
+		if (plain.startsWith(msgPrefix) && !plain.contains(usageLabel)) {
+			return true;
+		}
 
-        // ボタンそのものを無視の対象にはしない（Mixin側で判断する）
-        // ただし、既にボタンが付いているメッセージに対して、再度 addMessage が呼ばれた場合に
-        // 無限ループにならないようにする必要がある。
-        // 現状、Mixin は addMessage の引数を書き換えるだけなので、再帰的に addMessage を呼ばない限り安全。
+		// ボタンそのものを無視の対象にはしない（Mixin側で判断する）
+		// ただし、既にボタンが付いているメッセージに対して、再度 addMessage が呼ばれた場合に
+		// 無限ループにならないようにする必要がある。
+		// 現状、Mixin は addMessage の引数を書き換えるだけなので、再帰的に addMessage を呼ばない限り安全。
 
-        return false;
-    }
+		return false;
+	}
 
 	/**
 	 * 自動翻訳してチャットに表示する。
@@ -135,18 +103,12 @@ public class TranslatorModClient implements ClientModInitializer {
 	}
 
 	/**
-	 * チャットに [訳?] クリッカブルボタンを追加する。
-	 * クリックすると /trt <原文> が実行されて翻訳結果が表示される。
-	 */
-
-
-	/**
 	 * Hypixel モード時にチャンネルのモードを返す。
 	 * @return "AUTO" / "CLICK" / "OFF"
 	 */
 	public static String getHypixelChannelMode(String raw) {
 		TranslatorConfig config = TranslatorConfig.getInstance();
-		String text = STRIP_COLOR_PATTERN.matcher(raw).replaceAll("").trim();
+		String text = stripColor(raw).trim();
 
 		if (text.startsWith("Party >"))                                    return config.hypixelParty;
 		if (text.startsWith("Guild >"))                                    return config.hypixelGuild;

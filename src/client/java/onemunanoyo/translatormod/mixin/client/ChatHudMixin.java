@@ -19,12 +19,8 @@ import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.ModifyVariable;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
-import java.util.regex.Pattern;
-
 @Mixin(ChatComponent.class)
 public class ChatHudMixin {
-
-    private static final Pattern STRIP_COLOR_PATTERN = Pattern.compile("(?i)§[0-9A-FK-ORx]");
 
     @Inject(
             method = "addRecentChat(Ljava/lang/String;)V",
@@ -80,7 +76,7 @@ public class ChatHudMixin {
 
         // 翻訳対象のテキスト抽出（プレイヤー名を除去しようと試みる）
         // 一般的なチャット形式 "<Player> Message" or "Player: Message"
-        String rawText = STRIP_COLOR_PATTERN.matcher(content).replaceAll("").trim();
+        String rawText = TranslatorModClient.stripColor(content).trim();
         String translateTarget = rawText;
         int colonIndex = rawText.indexOf(": ");
         if (colonIndex != -1) {
@@ -106,7 +102,7 @@ public class ChatHudMixin {
                 );
 
         // 既存のボタンがすでにある場合は付与しない（重複防止）
-        String buttonLabel = STRIP_COLOR_PATTERN.matcher(I18n.getString("translatormod.chat.button")).replaceAll("").trim();
+        String buttonLabel = TranslatorModClient.stripColor(I18n.getString("translatormod.chat.button")).trim();
         if (rawText.contains(buttonLabel)) {
             return message;
         }
